@@ -1622,7 +1622,8 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
     const flushItem = () => {
       if (currentItem.title || currentItem.time) {
         newItems.push({
-          id: Date.now() + Math.random(),
+          // 🟢 修正重點：加上 Math.floor 強制轉成整數，解決 BigInt 錯誤
+          id: Math.floor(Date.now() + Math.random() * 10000), 
           dayId: currentDay,
           type: 'sightseeing',
           cost: 0,
@@ -1638,12 +1639,19 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
     lines.forEach((line) => {
       const cleanLine = line.trim();
       if (!cleanLine) return;
+      
+      // 偵測 Day X
       const dayMatch = cleanLine.match(/^(?:Day|D|第)\s*(\d+)/i);
       if (dayMatch) {
         flushItem();
-        currentDay = parseInt(dayMatch[1]);
+        // 如果匯入文字有寫 Day 2，就自動切換到第二天
+        // 但為了簡單，這裡通常建議讓使用者選哪天就匯入哪天，
+        // 或者保留這行讓它自動跳轉：
+        // currentDay = parseInt(dayMatch[1]); 
+        // 若想強制全部匯入到「目前選中的那天」，可以註解掉上面那行。
         return;
       }
+
       if (cleanLine.startsWith('時間:')) {
         flushItem();
         let rawTime = cleanLine.replace('時間:', '').trim();
@@ -1671,13 +1679,16 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
             (currentItem.notes ? currentItem.notes + '\n' : '') + cleanLine;
       }
     });
-    flushItem();
+    
+    flushItem(); // 確保最後一項也被加入
+
     if (newItems.length > 0) {
+      // 這裡直接儲存到資料庫
       save({ activities: [...activities, ...newItems] });
       toggleModal('import', false);
       alert(`成功匯入 ${newItems.length} 筆任務！`);
     } else {
-      alert('匯入失敗');
+      alert('匯入失敗：格式似乎不正確，請確認有包含「時間:」與「名稱:」');
     }
   };
 
