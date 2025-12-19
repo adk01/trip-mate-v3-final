@@ -1127,7 +1127,8 @@ const ImportModal = ({ isOpen, onClose, onImport, dayId }) => {
   };
   if (!isOpen) return null;
   return (
-    <div className={STYLES.modalOverlay}>
+    // 🟢 修改重點：加入 !items-start !pt-20 讓它往上跑
+    <div className={`${STYLES.modalOverlay} !items-start !pt-20 sm:!items-center sm:!pt-0`}>
       <div className={STYLES.modalContent}>
         <h2 className="text-lg font-bold text-[#2c1810] mb-2 flex items-center gap-2">
           <FileText size={20} /> 快速匯入
@@ -1147,7 +1148,8 @@ const ImportModal = ({ isOpen, onClose, onImport, dayId }) => {
         <textarea
           id="importText"
           rows="8"
-          className={STYLES.input + ' resize-none font-mono h-56'}
+          // 這裡高度也調整成 h-48 了
+          className={STYLES.input + ' resize-none font-mono h-48'}
           placeholder="貼上你的行程..."
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -1597,7 +1599,7 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
     const lines = text.replace(/：/g, ':').split('\n');
     const newItems = [];
     let currentItem = {};
-    let currentDay = targetDayId;
+    let currentDay = targetDayId; // 預設為目前選中的天數
 
     const typeMap = {
       移動: 'transport',
@@ -1622,7 +1624,7 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
     const flushItem = () => {
       if (currentItem.title || currentItem.time) {
         newItems.push({
-          // 🟢 修正重點：加上 Math.floor 強制轉成整數，解決 BigInt 錯誤
+          // 強制轉整數 ID (這行你已經修好了)
           id: Math.floor(Date.now() + Math.random() * 10000), 
           dayId: currentDay,
           type: 'sightseeing',
@@ -1630,6 +1632,12 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
           completed: false,
           location: '',
           notes: '',
+          
+          // 🟢【Root Cause 修復】在這裡補上預設值！
+          // 這樣資料庫裡的每一筆資料都會是健康的，UI 就不會崩潰。
+          transMode: 'train', // 預設交通方式為電車
+          transTime: 30,      // 預設交通時間 (可選)
+
           ...currentItem,
         });
         currentItem = {};
@@ -1640,15 +1648,11 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
       const cleanLine = line.trim();
       if (!cleanLine) return;
       
-      // 偵測 Day X
+      // 🟢 修復重點：偵測到 Day X 時，更新 currentDay
       const dayMatch = cleanLine.match(/^(?:Day|D|第)\s*(\d+)/i);
       if (dayMatch) {
-        flushItem();
-        // 如果匯入文字有寫 Day 2，就自動切換到第二天
-        // 但為了簡單，這裡通常建議讓使用者選哪天就匯入哪天，
-        // 或者保留這行讓它自動跳轉：
-        // currentDay = parseInt(dayMatch[1]); 
-        // 若想強制全部匯入到「目前選中的那天」，可以註解掉上面那行。
+        flushItem(); // 先儲存上一筆資料
+        currentDay = parseInt(dayMatch[1]); // ✅ 解除註解：更新天數 ID
         return;
       }
 
@@ -1680,15 +1684,14 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
       }
     });
     
-    flushItem(); // 確保最後一項也被加入
+    flushItem(); // 儲存最後一筆
 
     if (newItems.length > 0) {
-      // 這裡直接儲存到資料庫
       save({ activities: [...activities, ...newItems] });
       toggleModal('import', false);
       alert(`成功匯入 ${newItems.length} 筆任務！`);
     } else {
-      alert('匯入失敗：格式似乎不正確，請確認有包含「時間:」與「名稱:」');
+      alert('匯入失敗');
     }
   };
 
