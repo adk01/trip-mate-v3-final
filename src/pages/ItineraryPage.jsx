@@ -64,6 +64,9 @@ import {
 // ==========================================
 // 0. 內嵌樣式
 // ==========================================
+// ==========================================
+// 0. 內嵌樣式
+// ==========================================
 const INJECTED_STYLES = `
   .leaflet-container { width: 100%; height: 100%; z-index: 1; }
   
@@ -77,6 +80,17 @@ const INJECTED_STYLES = `
     background-size: 40px 40px, 40px 40px, auto;
     background-blend-mode: overlay;
     box-shadow: inset 0 0 100px rgba(44, 24, 16, 0.5);
+  }
+
+  /* 🟢 iOS 日期欄位強制靠左修正 (核彈級解法) */
+  input[type="date"] {
+    text-align: left;
+    -webkit-appearance: none;
+    display: block;
+  }
+  input[type="date"]::-webkit-date-and-time-value {
+    text-align: left;
+    margin-inline-start: 0;
   }
 
   .user-pulse-wrapper {
