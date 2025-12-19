@@ -173,15 +173,20 @@ const INITIAL_DATA = {
 };
 
 const STYLES = {
+  // 🟢 修正 1：Input 加入 text-left (靠左), h-10 (高度), leading-[36px] (強制文字垂直置中)
   input:
-    'w-full h-9 bg-[#fffcf5] border-2 border-[#8b4513] px-2 text-sm focus:outline-none box-border block',
+    'w-full h-10 bg-[#fffcf5] border-2 border-[#8b4513] px-3 text-sm text-[#2c1810] font-bold focus:outline-none box-border block text-left leading-[36px]',
+  
   label: 'text-[10px] font-bold text-[#8b4513] block mb-1',
   modalOverlay:
     'fixed inset-0 z-[1000] flex items-end sm:items-center justify-center bg-black/70 backdrop-blur-sm p-0 sm:p-4',
   modalContent:
     'bg-[#f4e4bc] w-full sm:max-w-md border-4 border-black p-4 shadow-2xl animate-slide-up relative max-h-[90vh] overflow-y-auto',
+  
+  // 🟤 修正 2：按鈕改為「深褐色」，消除藍色的科技感違和
   btnPrimary:
-    'w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 border-4 border-black mt-4 shadow-[2px_2px_0_0_black] active:shadow-none active:translate-y-1',
+    'w-full bg-[#8b4513] hover:bg-[#a0522d] text-[#f4e4bc] font-bold py-2 border-4 border-[#2c1810] mt-4 shadow-[2px_2px_0_0_#2c1810] active:shadow-none active:translate-y-1 tracking-widest',
+  
   btnIcon:
     'bg-[#2c1810] text-[#f4e4bc] p-1.5 rounded-sm border border-[#5c4835] active:scale-95 flex items-center justify-center',
 };
