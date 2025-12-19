@@ -1364,9 +1364,10 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
     }
     return list;
   }, [meta]);
-
   useEffect(() => {
+    // 1. 定義抓取資料的函式 (這部分保持你原本的邏輯不變)
     const fetchData = async () => {
+      // 抓行程
       const { data: acts } = await supabase
         .from('itinerary')
         .select('*')
@@ -1390,12 +1391,14 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
         setActivities(formatted);
       }
 
+      // 抓背包
       const { data: packs } = await supabase
         .from('backpack')
         .select('*')
         .order('id');
       if (packs) setBackpack(packs);
 
+      // 抓個人資料 (XP/Level)
       const { data: profile } = await supabase
         .from('profile')
         .select('*')
@@ -1409,21 +1412,121 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
       }
     };
 
+    // 2. 頁面載入時，先執行一次抓取
     fetchData();
+
+    // 3. ✨ 新增這段：建立即時監聽 (Realtime Subscription) ✨
+    const channel = supabase
+      .channel('app-db-changes') // 頻道名稱隨意，不重複即可
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'itinerary' }, // 監聽行程表
+        (payload) => {
+          console.log('行程表有變動，更新中...', payload);
+          fetchData(); // 重新抓取資料
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'backpack' }, // 監聽背包表
+        (payload) => {
+          console.log('背包有變動，更新中...', payload);
+          fetchData();
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profile' }, // 監聽個人資料表
+        (payload) => {
+          console.log('經驗值有變動，更新中...', payload);
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    // 4. 離開頁面時取消訂閱 (避免重複監聽佔用資源)
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
-  const save = async (updates) => {
-    const newState = { meta, activities, backpack, user, ...updates };
-    if (updates.meta) setMeta(updates.meta);
-    if (updates.activities) setActivities(updates.activities);
-    if (updates.backpack) setBackpack(updates.backpack);
-    if (updates.user) setUser(updates.user);
+// ✅ 1. 新增行程
+const handleAddActivity = async (newActivity) => {
+  // 這裡我們把前端的欄位轉成資料庫的欄位
+  const { error } = await supabase.from('itinerary').insert([
+    {
+      day: newActivity.dayId,
+      time: newActivity.time,
+      activity: newActivity.title, // 你的資料庫欄位叫 activity
+      location: newActivity.location,
+      cost: newActivity.cost,
+      type: newActivity.type || 'sightseeing',
+      notes: newActivity.notes || '',
+      trans_mode: newActivity.transMode || 'train',
+      trans_time: newActivity.transTime || '',
+      completed: false,
+    },
+  ]);
+  if (error) console.error('新增失敗:', error);
+};
 
-    if (db)
-      await db.collection('trips').doc(TRIP_ID).set(newState, { merge: true });
-    else localStorage.setItem('wp_local', JSON.stringify(newState));
-  };
+// ✅ 2. 修改行程 (例如打勾完成、改時間)
+const handleUpdateActivity = async (id, updates) => {
+  // 建立一個要更新的物件
+  const dbUpdates = {};
+  // 根據傳進來的更新內容，對應到資料庫欄位
+  if (updates.title) dbUpdates.activity = updates.title;
+  if (updates.dayId) dbUpdates.day = updates.dayId;
+  if (updates.transMode) dbUpdates.trans_mode = updates.transMode;
+  if (updates.transTime) dbUpdates.trans_time = updates.transTime;
+  if (updates.time) dbUpdates.time = updates.time;
+  if (updates.location) dbUpdates.location = updates.location;
+  if (updates.cost) dbUpdates.cost = updates.cost;
+  if (updates.type) dbUpdates.type = updates.type;
+  if (updates.notes) dbUpdates.notes = updates.notes;
+  // 特別處理布林值 (true/false)
+  if (updates.completed !== undefined) dbUpdates.completed = updates.completed;
 
+  const { error } = await supabase
+    .from('itinerary')
+    .update(dbUpdates)
+    .eq('id', id); // 鎖定要修改的那一筆 ID
+
+  if (error) console.error('更新失敗:', error);
+};
+
+// ✅ 3. 刪除行程
+const handleDeleteActivity = async (id) => {
+  const { error } = await supabase.from('itinerary').delete().eq('id', id);
+  if (error) console.error('刪除失敗:', error);
+};
+// ✅ 4. 更新背包 (Backpack)
+const handleUpdateBackpack = async (newItem) => {
+  // 假設 newItem 是一個完整的物品物件
+  const { error } = await supabase.from('backpack').insert([newItem]);
+  if (error) console.error('背包更新失敗:', error);
+};
+
+// ✅ 5. 刪除背包物品
+const handleDeleteBackpack = async (id) => {
+  const { error } = await supabase.from('backpack').delete().eq('id', id);
+  if (error) console.error('刪除背包失敗:', error);
+};
+
+// ✅ 6. 更新個人資料 (例如升級或加經驗值)
+const handleUpdateProfile = async (newXp, newLevel) => {
+  // 假設每個人只有一筆 profile，我們用 update
+  // 這裡假設你有個 user ID 或是針對當前用戶更新
+  // 如果你的 profile 表沒有 RLS 限制只能改自己，可能需要 .eq('id', userId)
+  
+  // 這裡示範最簡單的：更新第一筆 (依據你的邏輯調整)
+  const { error } = await supabase
+    .from('profile')
+    .update({ xp: newXp, level: newLevel })
+    .eq('id', 1); // ⚠️ 注意：這裡要確認你的 profile ID 是多少
+
+  if (error) console.error('更新個人資料失敗:', error);
+};
   const curActs = useMemo(
     () =>
       activities
