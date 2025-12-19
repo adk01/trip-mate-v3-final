@@ -1698,37 +1698,27 @@ const handleUpdateProfile = async (newXp, newLevel) => {
     await supabase.from('backpack').update({ text: newText }).eq('id', id);
   };
 
-  const handleSmartImport = (text, targetDayId) => {
+  const handleSmartImport = async (text, targetDayId) => {
     const lines = text.replace(/：/g, ':').split('\n');
     const newItems = [];
     let currentItem = {};
     let currentDay = targetDayId; // 預設為目前選中的天數
 
     const typeMap = {
-      移動: 'transport',
-      傳送: 'transport',
-      交通: 'transport',
-      吃飯: 'food',
-      用餐: 'food',
-      餐廳: 'food',
-      料理: 'food',
-      住宿: 'checkin',
-      飯店: 'checkin',
-      存檔: 'checkin',
-      景點: 'sightseeing',
-      參觀: 'sightseeing',
-      探險: 'sightseeing',
-      補給: 'shopping',
-      購物: 'shopping',
-      其他: 'other',
-      支線: 'other',
+      移動: 'transport', 傳送: 'transport', 交通: 'transport',
+      吃飯: 'food', 用餐: 'food', 餐廳: 'food', 料理: 'food',
+      住宿: 'checkin', 飯店: 'checkin', 存檔: 'checkin',
+      景點: 'sightseeing', 參觀: 'sightseeing', 探險: 'sightseeing',
+      補給: 'shopping', 購物: 'shopping',
+      其他: 'other', 支線: 'other',
     };
 
     const flushItem = () => {
       if (currentItem.title || currentItem.time) {
         newItems.push({
-          // 強制轉整數 ID (這行你已經修好了)
-          id: Math.floor(Date.now() + Math.random() * 10000), 
+          // ❌ 刪除：ID 讓 Supabase 自動產生，避免兩支手機衝突
+          // id: Math.floor(Date.now() + Math.random() * 10000), 
+          
           dayId: currentDay,
           type: 'sightseeing',
           cost: 0,
@@ -1736,10 +1726,9 @@ const handleUpdateProfile = async (newXp, newLevel) => {
           location: '',
           notes: '',
           
-          // 🟢【Root Cause 修復】在這裡補上預設值！
-          // 這樣資料庫裡的每一筆資料都會是健康的，UI 就不會崩潰。
-          transMode: 'train', // 預設交通方式為電車
-          transTime: 30,      // 預設交通時間 (可選)
+          // ✅ 保留預設值
+          transMode: 'train',
+          transTime: 30,
 
           ...currentItem,
         });
@@ -1747,15 +1736,16 @@ const handleUpdateProfile = async (newXp, newLevel) => {
       }
     };
 
+    // --- 這裡保留你原本的解析邏輯 ---
     lines.forEach((line) => {
       const cleanLine = line.trim();
       if (!cleanLine) return;
       
-      // 🟢 修復重點：偵測到 Day X 時，更新 currentDay
+      // 偵測 Day X
       const dayMatch = cleanLine.match(/^(?:Day|D|第)\s*(\d+)/i);
       if (dayMatch) {
-        flushItem(); // 先儲存上一筆資料
-        currentDay = parseInt(dayMatch[1]); // ✅ 解除註解：更新天數 ID
+        flushItem();
+        currentDay = parseInt(dayMatch[1]);
         return;
       }
 
@@ -1767,8 +1757,7 @@ const handleUpdateProfile = async (newXp, newLevel) => {
           currentItem.time = timeMatch[0].padStart(5, '0');
         } else {
           currentItem.time = '09:00';
-          currentItem.notes =
-            (currentItem.notes || '') + `[時間備註: ${rawTime}] `;
+          currentItem.notes = (currentItem.notes || '') + `[時間備註: ${rawTime}] `;
         }
       } else if (cleanLine.startsWith('類型:')) {
         const rawType = cleanLine.replace('類型:', '').trim();
@@ -1782,19 +1771,46 @@ const handleUpdateProfile = async (newXp, newLevel) => {
         currentItem.notes = (currentItem.notes || '') + note;
       } else {
         if (currentItem.time)
-          currentItem.notes =
-            (currentItem.notes ? currentItem.notes + '\n' : '') + cleanLine;
+          currentItem.notes = (currentItem.notes ? currentItem.notes + '\n' : '') + cleanLine;
       }
     });
     
     flushItem(); // 儲存最後一筆
 
+    // --- 🟢 下面這段是修改重點：寫入 Supabase ---
+
     if (newItems.length > 0) {
-      save({ activities: [...activities, ...newItems] });
-      toggleModal('import', false);
-      alert(`成功匯入 ${newItems.length} 筆任務！`);
+      // 1. 轉換格式 (前端欄位 -> 資料庫欄位)
+      const dbRecords = newItems.map(item => ({
+        day: item.dayId,             // 對應資料庫 day
+        time: item.time || '09:00',
+        activity: item.title || '未命名行程', // 對應資料庫 activity
+        location: item.location,
+        cost: item.cost,
+        type: item.type,
+        notes: item.notes,
+        trans_mode: item.transMode,  // 對應資料庫 trans_mode
+        trans_time: item.transTime,  // 對應資料庫 trans_time
+        completed: false
+      }));
+
+      // 2. 寫入資料庫
+      try {
+        const { error } = await supabase.from('itinerary').insert(dbRecords);
+        
+        if (error) throw error;
+
+        toggleModal('import', false);
+        alert(`成功匯入 ${newItems.length} 筆任務！`);
+        // 不用呼叫 save()，Realtime 會自動更新畫面
+
+      } catch (err) {
+        console.error('匯入錯誤:', err);
+        alert('匯入失敗：' + err.message);
+      }
+
     } else {
-      alert('匯入失敗');
+      alert('沒有偵測到可匯入的行程');
     }
   };
 
