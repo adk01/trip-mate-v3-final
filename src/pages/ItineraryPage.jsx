@@ -992,96 +992,106 @@ const BackpackModal = ({
   );
 };
 
-const TripSettingsModal = ({ isOpen, onClose, tripMeta, onUpdateTrip }) => {
-  const [localMeta, setLocalMeta] = useState(tripMeta);
+const TripSettingsModal = ({ isOpen, onClose, meta, onUpdateMeta }) => {
+  // 🛡️ 安全防護：如果 meta 是空的，就使用預設值，避免畫面崩潰
+  const safeMeta = meta || { 
+    title: '', 
+    startDate: new Date().toISOString().split('T')[0], 
+    dayCount: 1, 
+    totalBudget: 0, 
+    coverImage: '' 
+  };
+
+  const [formData, setFormData] = useState(safeMeta);
+
+  // 當 Modal 開啟或資料變更時，更新表單資料
   useEffect(() => {
-    setLocalMeta(tripMeta);
-  }, [tripMeta]);
+    if (isOpen) {
+      setFormData(meta || safeMeta);
+    }
+  }, [isOpen, meta]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
   const handleSave = () => {
-    onUpdateTrip(localMeta);
+    onUpdateMeta(formData);
     onClose();
   };
+
   if (!isOpen) return null;
 
-  const inputClass =
-    'w-full h-10 bg-[#fffcf5] border-2 border-[#8b4513] px-3 text-sm focus:outline-none focus:border-blue-500 transition-colors box-border rounded-none min-w-0';
-
   return (
-    <div className={STYLES.modalOverlay}>
-      <div className={STYLES.modalContent}>
-        <h2 className="text-lg font-bold text-[#2c1810] mb-4 flex items-center gap-2">
-          <Settings size={20} /> 行程設定
-        </h2>
-
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className={STYLES.label}>冒險名稱</label>
-            <input
-              type="text"
-              value={localMeta.title}
-              onChange={(e) =>
-                setLocalMeta({ ...localMeta, title: e.target.value })
-              }
-              className={inputClass}
-            />
-          </div>
-          <div>
-            <label className={STYLES.label}>出發日期</label>
-            <input
-              type="date"
-              value={localMeta.startDate}
-              onChange={(e) =>
-                setLocalMeta({ ...localMeta, startDate: e.target.value })
-              }
-              className={inputClass}
-            />
-          </div>
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <label className={STYLES.label}>天數</label>
-              <input
-                type="number"
-                min="1"
-                max="30"
-                value={localMeta.dayCount}
-                onChange={(e) =>
-                  setLocalMeta({
-                    ...localMeta,
-                    dayCount: parseInt(e.target.value) || 1,
-                  })
-                }
-                className={inputClass}
-              />
-            </div>
-            <div className="flex-1">
-              <label className={STYLES.label}>總預算 (Gold)</label>
-              <input
-                type="number"
-                value={localMeta.totalBudget}
-                onChange={(e) =>
-                  setLocalMeta({
-                    ...localMeta,
-                    totalBudget: parseInt(e.target.value) || 0,
-                  })
-                }
-                className={inputClass}
-              />
-            </div>
-          </div>
+    <div className={STYLES.modalOverlay} onClick={onClose}>
+      <div className={STYLES.modalContent} onClick={e => e.stopPropagation()}>
+        {/* 標題區 */}
+        <div className="bg-[#2c1810] p-3 border-b-4 border-[#f4e4bc] flex justify-between items-center mb-4">
+          <h2 className="text-[#f4e4bc] font-bold flex items-center gap-2">
+            <Settings size={20} /> 冒險設定
+          </h2>
+          <button onClick={onClose} className="text-[#f4e4bc] active:scale-90 transition-transform">
+            <X size={24} />
+          </button>
         </div>
 
-        <div className="flex gap-2 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 bg-gray-500 text-white font-bold py-2 border-b-4 border-gray-700 active:border-b-0 active:translate-y-1 rounded-sm"
-          >
-            取消
-          </button>
-          <button
-            onClick={handleSave}
-            className="flex-1 bg-blue-600 text-white font-bold py-2 border-b-4 border-blue-800 active:border-b-0 active:translate-y-1 rounded-sm"
-          >
-            儲存
+        {/* 表單內容區 */}
+        <div className="space-y-4">
+          <div>
+            <label className={STYLES.label}>旅程標題 (Quest Title)</label>
+            <input
+              type="text"
+              name="title"
+              value={formData.title}
+              onChange={handleChange}
+              className={STYLES.input}
+            />
+          </div>
+
+          {/* 日期與天數 */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="w-full">
+              <label className={STYLES.label}>出發日期 (Start Date)</label>
+              <div className="relative w-full">
+                <input
+                  type="date"
+                  name="startDate"
+                  value={formData.startDate}
+                  onChange={handleChange}
+                  className={STYLES.input}
+                  style={{ WebkitAppearance: 'none' }} 
+                />
+              </div>
+            </div>
+            <div className="w-full">
+              <label className={STYLES.label}>天數 (Duration)</label>
+              <input
+                type="number"
+                name="dayCount"
+                value={formData.dayCount}
+                onChange={handleChange}
+                className={STYLES.input}
+              />
+            </div>
+          </div>
+
+          {/* 預算 */}
+          <div>
+            <label className={STYLES.label}>總預算 (Total Gold)</label>
+            <div className="relative">
+              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+              <input
+                type="number"
+                name="totalBudget"
+                value={formData.totalBudget}
+                onChange={handleChange}
+                className={`${STYLES.input} pl-6`}
+              />
+            </div>
+          </div>
+          <button onClick={handleSave} className={STYLES.btnPrimary}>
+            儲存設定 (SAVE)
           </button>
         </div>
       </div>
@@ -1740,8 +1750,8 @@ export default function ItineraryPage({ appSettings, onOpenSettings }) {
         <TripSettingsModal
           isOpen={modals.settings}
           onClose={() => toggleModal('settings', false)}
-          tripMeta={meta}
-          onUpdateTrip={(newMeta) => save({ meta: newMeta })}
+          meta={meta}  // ⭕️ 改成 meta，跟組件定義一致
+          onUpdateMeta={(newMeta) => save({ meta: newMeta })} // ⭕️ 改成 onUpdateMeta
         />
         <BudgetStatsModal
           isOpen={modals.stats}
